@@ -15,3 +15,6 @@
 - Dashboard wallets for both.
 - Conversion tools with fee transparency.
 - Public profiles show net worth (AF + MB).
+
+## Digital Deeds NFT's
+- These can be sold.
