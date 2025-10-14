@@ -1,4 +1,5 @@
-# megamvx
+# MegatonCities MVX - Megavxworld - https://megavxworld.com
+
 Core design and documentation hub for the MegatonCities MVX PWA platform.
 We refer to the patform as the "MAST-Technology Platform". "In the MegatonMVX system, we use the MAST framework. Think of it as the mast of a yacht. 
 It's the central pillar that everything else is built upon. It supports the sails of our being and our stories/journey allowing us to harness the winds of creativity, and gives us the stability to navigate the vast and often chaotic seas of the multiverse. Without a strong mast, the ship goes nowhere. With MAST, we can journey anywhere."
