@@ -1,4 +1,4 @@
-# MegatonCities MVX - Megavxworld - https://megavxworld.com
+# MegatonCities MVX - Megavxworld - https://megavxworld.com - Master Plan
 
 Core design and documentation hub for the MegatonCities MVX PWA platform.
 We refer to the patform as the "MAST-Technology Platform". "In the MegatonMVX system, we use the MAST framework. Think of it as the mast of a yacht. 
