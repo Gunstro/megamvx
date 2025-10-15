@@ -1,9 +1,9 @@
 # Technical Stack and Implementation
 
 ## Core Stack
-- **Frontend**: React/Next.js + TypeScript.
+- **Frontend**: Bootstrap5 + Vanillajs.
 - **Database**: Supabase.
-- **Styling**: TailwindCSS.
+- **Styling**: CSS.
 - **PWA Features**: Service workers, offline support, push notifications.
 
 ## Real-World Integrations
