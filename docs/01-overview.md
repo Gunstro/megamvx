@@ -16,7 +16,7 @@ MegatonCities MVX (MVX) is a PWA platform designed to assist the user achieve fi
 - **Real-World Tech**: MDPs for messaging, CVBs for proximity rewards.
 
 ## Technical Foundation
-- Stack: React/Next.js + TypeScript + TailwindCSS + Supabase
+- Stack: Mobile PWA Bootstrap 5. Powered by Bootstrap 5.x with no jQuery dependency, written in Vanilla JS. However, we can still use jQuery if needed! + Supabase Database
 - PWA for offline/online functionality.
 - Integration points for DeFi/NFTs (e.g., Digital Deeds Registry).
 
