@@ -22,7 +22,7 @@ MVX (MegatonCities Virtual X-perience) empowers users to achieve £2,500/month i
 - **VISA System**: Tiered membership with matrix positions and income caps.
 - **Currencies**: AF (stable) and MB (growth) with punitive exchange mechanics.
 - **Partner Program**: Geographic ownership for additional commissions.
-- **Technical Stack**: Mobile PWA Bootstrap 5. Powered by Bootstrap 5.x with no jQuery dependency, written in Vanilla JS. However, we can use jQuery if needed! + Supabase backend database.
+- **Technical Stack**: Reactjs + Nextjs + tailwind css + Supabase backend database.
 
 ## Documentation Structure
 - [Overview](./docs/01-overview.md) - Project vision and high-level architecture.
