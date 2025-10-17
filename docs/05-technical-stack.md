@@ -1,7 +1,7 @@
 # Technical Stack and Implementation
-
+Super PWA 
 ## Core Stack
-- **Frontend**: Bootstrap5 + Vanillajs.
+- **Frontend**: Reactjs, Nextjs + tailwind + Vanillajs.
 - **Database**: Supabase.
 - **Styling**: CSS.
 - **PWA Features**: Service workers, offline support, push notifications.
