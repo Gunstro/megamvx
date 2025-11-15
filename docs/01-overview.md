@@ -1,7 +1,7 @@
 # MVX Project Overview
 
 ## Vision
-MegatonCities MVX (MVX) is a PWA platform designed to assist the user achieve financial independence, targeting £2,500/month income through a structured matrix commission system without mandatory recruitment.
+MegatonCities MVX (MVX) is a SUPER PWA platform designed to assist the user achieve financial independence, targeting at least an income of £2,500/month via the structured matrix commission system without mandatory recruitment.
 
 ## Core Philosophy
 - Non-MLM model using matrix math for fair commission distribution.
