@@ -18,3 +18,15 @@
 - Sellable/inheritable rights.
 - Earnings from geographic activities.
 - Dashboard integration with map drill-down.
+- Starts at the lowest map level (admin Level = Ward) - Every aspect takes place at this level and adds up the admin level tree as follows:
+- -  All MegaWards belong to a particular MegaMunicipality
+  -  All MegaMunicipalities belong to a MegaProvince
+  -  All MegaProvinces belong to a MegaCountry
+  -  Selected MegaCountries belong to a MegaZone
+ 
+## Purchase Ownership
+- We have the following 3 country types - Poor Countries, Developing Countries, Developed Countries
+- Value of Poor Countries = £ .015
+- Value of Developing Countries = £ .025
+- Value of Developed Countries = £ .035 
+- Cost per program is determined by population
