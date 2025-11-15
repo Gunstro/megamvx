@@ -7,17 +7,17 @@ VISA = Membership access + matrix position. Grants commission eligibility and pl
 ### Super (Level 1, 20k positions)
 - Gold VIP: £2,500 (lifetime), cap £25k, 11,750 spots.
 - VIP: £1,850 (lifetime), cap £21k, 8,250 spots.
-- Connects to 20 Level 2 members.
+- Each position Connects to 20 Level 2 members.
 
 ### Intermediate (Level 2, 400k positions)
 - Gold Premiere: £875 + £575/month, cap £18.5k, 225k spots.
 - Premiere: £775 + £395/month, cap £12.5k, 175k spots.
-- Connects to 10 Level 3 members.
+- Each position Connects to 10 Level 3 members.
 
 ### Standard (Level 3+, uncapped)
 - Upgradeable tiers (Executive to Free VISA).
-- Monthly fees start after commissions exceed by 10%.
-- Connects to 5 members per position.
+- Monthly fees start after commissions earnings exceed by 10%.
+- Each position Connects to 5 members per position.
 
 ## Matrix Structure
 - Level 0: Company.
