@@ -9,7 +9,7 @@ Metaphysical Anchor: In the chaotic, infinite "sea" of the multiverse (the VX-Ne
 
 Story Tether: It's what connects the players to the narrative and to each other. No matter how far the story "sails" into strange realms, this tether ensures it remains a coherent, collaborative experience.
 
-The Megaton System, MAST™, and all associated logos and content are © [Year] [Your Name/Company Name]. All rights reserved
+The Megaton System, MAST™, and all associated logos and content are © [2008] [Gunstro Holdings (Pty) Ltd]. All rights reserved
 
 # MegatonCities MVX - Project Master Plan
 
