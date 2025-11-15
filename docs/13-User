@@ -15,7 +15,7 @@ We have 3 states:
 2.6 We need to show user any possible friends 
 2.7 The user must have a bragging rights section where all the badges are displayed. We need a table for the badges - ID, Name, Image, List Number, attached advantages, 
 2.8 The user will also have a "MegaTrust" score - This score is out of 100. 100 being the best most trustworthy. This trust is connected to individuals/businesses that vouch for the user. We need to have a table with 
-2.9 
+2.9 KYC - Know Your Client - Vital aspect to ensure all required details are provided for banking and ather similar reasons.
 
 3. Visitor - MegatonCities user visiting the profile of the user
 
