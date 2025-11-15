@@ -10,6 +10,7 @@ Super PWA
 - **Bluetooth MDPs**: Geo-located messaging points (UUID detection).
 - **CVBs**: Proximity-activated virtual billboards (20m radius, MB rewards).
 - **Fragments (Frags)**: Unique geo-areas for ownership.
+- Mobile phone buletooth to switch on when PWA is opened.
 
 ## Advanced Features
 - **DeFi/NFTs**: Digital Deeds Registry (DDReg) for verifiable contributions.
@@ -20,3 +21,6 @@ Super PWA
 - Phase 1: VISA selection and dashboard.
 - Phase 2: Partner Program maps.
 - Phase 3: MDP/CVB integrations.
+
+## Security 
+- Hedera Hashgraph
