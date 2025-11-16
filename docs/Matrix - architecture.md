@@ -1,3 +1,6 @@
+📁 FILE 3: /docs/MATRIX-ARCHITECTURE.md
+
+```markdown
 # Matrix Architecture & Placement Logic
 
 ## Database Schema
@@ -30,3 +33,38 @@ CREATE TABLE user_matrix_positions (
 -- Spatial indexes for performance
 CREATE INDEX user_matrix_path_idx ON user_matrix_positions USING GIST(position_path);
 CREATE INDEX user_matrix_upline_idx ON user_matrix_positions(upline_user_id);
+```
+
+Placement Algorithms
+
+Level 1 & 2 Placement (Fixed Capacity)
+
+```sql
+-- Atomic position claiming
+UPDATE matrix_level_capacity 
+SET current_count = current_count + 1
+WHERE level = 1 
+  AND tier_name = 'Gold VIP'
+  AND current_count < max_capacity
+RETURNING current_count;
+```
+
+Level 3+ Placement (Breadth-First Fill)
+
+```sql
+-- Find first available position for sponsor
+SELECT id FROM user_matrix_positions 
+WHERE upline_user_id = 'sponsor_uuid'
+  AND direct_downlines_count < max_downlines
+ORDER BY created_at ASC 
+LIMIT 1;
+```
+
+Upgrade Mechanics
+
+· Automatic suggestions when users hit 80% of earning cap
+· Forced upgrades when cap reached (to continue earning)
+· Upgrade funding can use earned balance
+· No cross-grading between tiers
+
+```
