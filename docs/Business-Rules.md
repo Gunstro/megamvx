@@ -1,5 +1,53 @@
 # Business Logic & Rules
 
+LATEST DISCUSSION 
+
+# Business Logic & Rules
+
+## VISA Tier System
+
+### Fixed Capacity Tiers (Non-Upgradable)
+**Level 1 (20,000 total)**
+- Gold VIP: 11,750 spots | £2,500 upfront | £25,000 cap | Ads: 0
+- VIP: 8,250 spots | £1,850 upfront | £21,000 cap | Ads: 0
+
+**Level 2 (400,000 total)**
+- Gold Premiere: 225,000 spots | £875 + £575/month | £18,500 cap | Ads: 0
+- Premiere: 175,000 spots | £775 + £395/month | £12,500 cap | Ads: 0
+
+### Standard Tiers (Upgradable to Executive)
+- Free → Basic → Premium → Executive (Max)
+- Monthly fees start after commissions exceed fee amount by 10%
+
+## Matrix Structure
+- **Level 0**: Company (1 position)
+- **Level 1**: 20,000 positions (connects to 20 L2 members)
+- **Level 2**: 400,000 positions (connects to 10 L3 members)
+- **Level 3+**: Uncapped (connects to 5 members each)
+- **No cross-grading**: Upgrades only
+
+## Commission System
+### 35% One-Time Commission
+- **Applies only**: Level 1 & 2 VISA sales
+- **Paid to**: Verified recruiter
+- **Hold period**: 30 days before withdrawal
+- **Double-dipping**: Recruiter ALSO receives ongoing matrix commissions
+
+### Ongoing Matrix Commissions
+- L1: 20%, L2: 3%, L3: 4%, L4: 6%, L5: 8%
+- Balance to L0: 6% L1, 4% L2, 3% L3, 20% L4, direct L5
+- 20% to MB, 20% to matrix bottom for sustainability
+
+## Geographic Hierarchy
+- Level 0: Countries
+- Level 1: Provinces/States
+- Level 2: Municipalities
+- Level 3: Wards
+- Level 4: MegatonCities (>2M population)
+
+  INITIAL DISCUSSION 
+
+
 ## VISA Tier System
 *VISA System and Matrix
 Overview
