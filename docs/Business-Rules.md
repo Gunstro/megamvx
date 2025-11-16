@@ -1,4 +1,3 @@
-
 # Business Logic & Rules
 
 ## VISA Tier System
@@ -8,12 +7,12 @@ VISA = Membership access + matrix position. Grants commission eligibility and pl
 
 Categories and Tiers
 Super (Level 1, 20k positions)
-Gold VIP: £2,500 (lifetime), cap £25k, 11,750 spots.
-VIP: £1,850 (lifetime), cap £21k, 8,250 spots.
+Gold VIP: £2,500 (lifetime), cap £25k, 11,750 spots. Ads0
+VIP: £1,850 (lifetime), cap £21k, 8,250 spots. Ads0
 Each position Connects to 20 Level 2 members.
-Intermediate (Level 2, 400k positions)
-Gold Premiere: £875 + £575/month, cap £18.5k, 225k spots.
-Premiere: £775 + £395/month, cap £12.5k, 175k spots.
+Intermediate (Level 2, 400k positions) 
+Gold Premiere: £875 + £575/month, cap £18.5k, 225k spots. Ads0
+Premiere: £775 + £395/month, cap £12.5k, 175k spots. 
 Each position Connects to 10 Level 3 members.
 Standard (Level 3+, uncapped)
 Upgradeable tiers (Executive to Free VISA).
