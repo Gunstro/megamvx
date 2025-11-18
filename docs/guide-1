@@ -77,6 +77,7 @@ markdown
 - **Level 4**: Municipalities  
 - **Level 5**: Wards
 - **Level 6**: MegatonCities (>2 million population)
+The levels above are not the matrix level - they are admin levels
 
 ## Data Specifications
 - **Format**: Simplified GeoJSON
@@ -390,7 +391,10 @@ Level 3+: Each connects to 5 members
 
 🔄 Critical Questions for Clarity
 1. Position Assignment Logic
-How do users get their matrix positions?
+How do users get their matrix positions? When they enroll they need to make a decission. The decission is permanent and final when deciding either 'Super', 'Intermediate', 'Standard'. The user basically gets the next available matrix position
+Super = Level 1
+Intermediate = Level 2
+Satandard = Level 3+
 
 Automatic sequential filling?
 
