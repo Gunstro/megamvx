@@ -1,4 +1,4 @@
- 📁 File 1: /docs/CORE-STACK.md
+📁 File 1: /docs/CORE-STACK.md
 markdown
 # MegatonCities MVX - Core Technology Stack
 
@@ -35,7 +35,7 @@ markdown
 # Business Logic & Rules
 
 ## VISA Tier System
-*(GS - Please fill in your exact VISA tier specifications)*
+*See in doc 02-visa-system*
 
 ### Tier Structure:
 - **VISA FREE**: Basic access level
