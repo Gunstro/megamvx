@@ -69,12 +69,13 @@ markdown
 markdown
 # Geographic Architecture
 
-## Boundary Hierarchy Levels
-- **Level 0**: Countries (Admin 0)
-- **Level 1**: Provinces/States
-- **Level 2**: Municipalities  
-- **Level 3**: Wards
-- **Level 4**: MegatonCities (>2 million population)
+## MVX - Boundary Hierarchy Levels
+- **Level 0**: Company 1 Position (Admin 0)
+- **Level 1**: Countries (Admin 1)
+- **Level 2**: Provinces/States
+- **Level 4**: Municipalities  
+- **Level 5**: Wards
+- **Level 6**: MegatonCities (>2 million population)
 
 ## Data Specifications
 - **Format**: Simplified GeoJSON
