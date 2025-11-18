@@ -643,17 +643,15 @@ Computationally efficient for large matrices
 Fair distribution across all sponsors
 
 🎯 Critical Questions for Your Business Rules:
-When Level 1 is full - Can new Gold VIPs still join? Where?
+When Level 1 is full - Can new Gold VIPs still join? Where? No - No more at all
 
-Upgrade priority - Do upgraded users get better positions?
+Upgrade priority - Do upgraded users get better positions? Users remain in their position forever no matter what!
 
-Inactive users - Do they hold matrix positions indefinitely?
+Inactive users - Do they hold matrix positions indefinitely? Yes
 
-This placement algorithm ensures every VISA holder gets their exact entitled matrix position while maintaining the fixed structure you've designed.
+This placement algorithm ensures every VISA holder gets their exact entitled matrix position while maintaining the fixed structure you've designed. Yes
 
-Should I proceed with the detailed implementation, or do you want to modify any placement rules?
-
-Level 0 company -
+Level 0 company - Exraordinary World Ventures (Pty) Ltd
 Level 1 = 20,000 of which there are 11750 Gold VIP & VIP 8250. No more available and level 1 is then filled up. No upgrade or cross grade 
 Same goes for level 2. Gold premiere 225 000 spots and premiere 175 000 spots. No more when these spots have been taken no more. Also no cross or updrade. 
 Perfect! This clarifies the matrix structure significantly. Now I understand it's a fixed, non-expandable matrix with strict limits at each level.
@@ -675,7 +673,7 @@ Premiere: 175,000 spots
 
 Once filled → NO MORE Level 2 positions ever
 
-Level 3+ (Uncapped)
+Level 3+ (Uncapped) stick to levels sizes i.e. = L3=20,000,000 - L4=100,000,000 - L5=500,000,000 - L6=1,500,000,000 - L7= 3,500,000,000,
 
 Standard tiers with upgrade paths
 
@@ -943,9 +941,10 @@ Eligibility - Only Level 1 & 2 sales? What about Standard VISA upgrades?
 
 Multiple Commissions - If A recruits B who recruits C for Level 1, who gets the 35%?
 
-Chargebacks - What if buyer refunds? Commission reversal?
+Chargebacks - What if buyer refunds? Commission reversal? 2 aspects are important - If the users has started to use the system in any way then they cannot call for refunding. However we as a buisness allows for a 
+15-day cooling off period in general.
 
-Cap Impact - Does this count toward the recruiter's earning cap?
+Cap Impact - Does this count toward the recruiter's earning cap? YES
 
 🔧 Recommended Implementation
 Treat as Separate Commission Stream:
@@ -2242,9 +2241,3 @@ Enhances MegaList business directory
 
 Creates geographic economic layers
 
-🚀 READY FOR MAPPING SYSTEM DESIGN
-The foundation is solid. We're now designing the geographic economic layer where users can own virtual territories and earn from all activity within their boundaries.
-
-This summary should give any AI (or me in a new chat) complete context to continue designing the Partner Program mapping system.
-
-Should I format this differently for your needs, or are you ready to launch into the geographic territory system?
