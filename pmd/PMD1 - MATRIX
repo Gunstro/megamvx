@@ -1,1 +1,298 @@
+MegaMatrix Commission Engine - PRD
+1. Executive Summary
+Project: MegaMatrix Commission Engine (Core Revenue System)
+Purpose: Automated commission distribution, user tier management, and poverty fund allocation for MegatonCities MVX
+Currency: GBP (£) exclusively
+Core Principle: "Auto-upgrade users to Ambassador tier as quickly as possible"
 
+2. Business Objectives
+Automate 40% matrix commission distribution (20%/3%/4%/5%/8% upward flow)
+
+Enforce tier-based monthly earning caps
+
+Auto-manage user upgrades using earned commissions
+
+Allocate surplus to Poverty Fund (80% relief, 20% MegaBucks)
+
+Provide real-time financial visibility to users
+
+Ensure system scales to billions of transactions
+
+3. User Personas
+Free User: Entry-level, £95 monthly cap, auto-upgrades to Novice at £95
+
+Standard User: Novice → City Dweller → City Patron → Executive → Ambassador
+
+Premiere User: Gold Premiere & VIP Gold Premiere (Level 2 only)
+
+Founder User: Gold Founder & VIP Gold Founder (Level 1 only)
+
+Poverty Relief Ltd: Level 0 entity, receives overflow commissions
+
+Megaton Devco Ltd: Platform owner, receives 31.5% revenue share
+
+4. Core Features
+4.1 User Onboarding & Visa Assignment
+text
+Flow:
+1. User selects visa tier (sees real-time stock levels for Levels 1&2)
+2. System validates level eligibility (Level 1/2 visas → specific levels only)
+3. For Level 1/2: First-come, first-served global allocation
+4. For Level 3+: Sponsor-based or orphan assignment
+5. Assign matrix position (sponsor_id, matrix_level, position tracking)
+6. Initialize financial tracking
+4.2 Commission Distribution
+text
+Trigger: Visa purchase (after 10-day holding period)
+Calculation:
+- 40% of purchase → Matrix commissions
+- Distribution: 5 levels upward from purchaser
+- Rates: 20% → 3% → 4% → 5% → 8%
+- Overflow: Missing upline levels → Poverty Relief Ltd
+- MegaPartner: Separate 28.5% geographic commission (Phase 2)
+4.3 Auto-Upgrade System
+text
+Priority Order:
+1. Check if wallet ≥ next tier price
+2. If YES → Auto-upgrade immediately
+3. If NO → Check monthly fee trigger
+4. If NO → Check cap surplus
+
+Rules:
+- Free users: Auto-upgrade to Novice at £95 wallet
+- Paid users: Upgrade when wallet ≥ next tier price
+- Goal: Push all users to Ambassador tier
+4.4 Monthly Fee Management
+text
+Trigger: Monthly earnings ≥ (monthly_fee × 110%)
+Example: City Dweller (£195 monthly fee)
+- Trigger at: £195 × 110% = £214.50
+- Deduct: £195 from wallet
+- Excess: £19.50 stays in wallet for upgrades
+4.5 Cap Enforcement
+text
+Rule: Wallet cannot exceed monthly cap
+Process:
+1. Check upgrade possibility first
+2. If upgrade possible → upgrade (increases cap)
+3. If upgrade not possible → surplus to Poverty Fund
+4. Remaining balance ≤ monthly cap
+4.6 Poverty Fund Allocation
+text
+Sources:
+- Cap surplus (when users can't upgrade)
+- Overflow commissions (missing upline levels)
+- Direct donations
+
+Monthly Distribution:
+- 80% → Actual poverty relief projects
+- 20% → MegaBucks value increase
+5. Visa Tier Specifications (GBP)
+Tier	Once-off	Monthly Fee	Monthly Cap	Level	Stock Qty	Auto-upgrade Rule
+Free	£0	£0	£95	3+	Unlimited	At £95 → Novice
+Novice	£95	£125	£300	3+	Unlimited	Wallet ≥ £295
+City Dweller	£295	£195	£1,350	3+	Unlimited	Wallet ≥ £395
+City Patron	£395	£325	£2,150	3+	Unlimited	Wallet ≥ £495
+Executive	£495	£395	£6,500	3+	Unlimited	Wallet ≥ £695
+Ambassador	£695	£545	£8,500	3+	Unlimited	Wallet ≥ £985
+Gold Premiere	£985	£785	£12,500	2	175,000	Wallet ≥ £1,250
+VIP Gold Premiere	£1,250	£995	£18,000	2	225,000	Wallet ≥ £2,250
+Gold Founder	£2,250	£0	£20,000	1	8,250	Wallet ≥ £3,750
+VIP Gold Founder	£3,750	£0	£22,500	1	11,750	MAX TIER
+6. Matrix Structure
+6.1 Fixed Hierarchy
+text
+Level 0: Poverty Relief Ltd (1 position)
+Level 1: 20,000 positions (Founder visas only)
+Level 2: 400,000 positions (Premiere visas only)
+Level 3+: Unlimited positions (Standard visas)
+6.2 Sponsorship Capacity
+Level 0 → 20,000 children
+
+Level 1 → 20 children each
+
+Level 2 → 10 children each
+
+Level 3+ → 5 children each
+
+6.3 Position Assignment Rules
+Level 1/2 visas: Global queue, first-come first-served
+
+Level 3+ visas: Sponsor-based or orphan assignment
+
+Orphans: "Knitting machine" fills matrix optimally
+
+7. Financial Flows
+7.1 Purchase Flow (£100 Example)
+text
+Total: £100
+├── Company Share: £31.50 (31.5%)
+│   ├── Product Costs: TBD
+│   ├── Platform Costs: TBD
+│   └── Profit: TBD
+│
+└── Commission Pool: £68.50 (68.5%)
+    ├── Matrix Commissions: £40.00 (40%)
+    │   ├── Upline Level 1: £20.00
+    │   ├── Upline Level 2: £3.00
+    │   ├── Upline Level 3: £4.00
+    │   ├── Upline Level 4: £5.00
+    │   └── Upline Level 5: £8.00
+    │
+    └── MegaPartner Commissions: £28.50 (28.5%) [Phase 2]
+7.2 User Earnings Flow
+text
+Earnings Received:
+1. Add to wallet_balance_gbp
+2. Check: wallet ≥ next tier price?
+   YES → Auto-upgrade, deduct price
+   NO → Continue
+3. Check: this_month_earnings ≥ (monthly_fee × 110%)?
+   YES → Deduct monthly_fee from wallet
+   NO → Wait
+4. Check: wallet > monthly_cap?
+   YES → Move surplus to Poverty Fund
+   NO → Keep in wallet
+8. System Requirements
+8.1 Performance
+Handle 1,000+ registrations per minute
+
+Process 10,000+ commission events per hour
+
+Real-time wallet updates
+
+99.9% uptime requirement
+
+8.2 Security
+Financial transaction audit trail
+
+GDPR compliance for user data
+
+PCI compliance for payment data (Phase 2)
+
+Fraud detection and prevention
+
+8.3 Compliance
+UK financial regulations
+
+Anti-money laundering (AML) checks
+
+Know Your Customer (KYC) verification
+
+Tax reporting capabilities
+
+9. Success Metrics
+9.1 Business Metrics
+User upgrade velocity (Free → Ambassador timeline)
+
+Commission distribution accuracy (100% required)
+
+Poverty Fund growth rate
+
+System uptime (99.9% target)
+
+9.2 User Metrics
+Average time to first upgrade
+
+Monthly earnings per user tier
+
+User satisfaction with auto-upgrade system
+
+Matrix visualization usability score
+
+10. Phased Implementation
+Phase 1: Core Engine (Weeks 1-4)
+Database schema (GBP)
+
+User registration & visa assignment
+
+Basic commission calculation
+
+Auto-upgrade for Free → Novice
+
+Monthly fee triggers
+
+Phase 2: Enhanced Features (Weeks 5-8)
+Full auto-upgrade system
+
+Cap enforcement & Poverty Fund
+
+Matrix visualization API
+
+Admin dashboard
+
+Audit logging
+
+Phase 3: Scale & Integration (Weeks 9-12)
+MegaPartner commission system
+
+Payment gateway integration
+
+Advanced reporting
+
+Performance optimization
+
+Production deployment
+
+11. Open Questions & Decisions Needed
+11.1 Technical Decisions
+Database sharding strategy for billions of positions?
+
+Real-time vs batch commission processing?
+
+Event-driven vs synchronous architecture?
+
+11.2 Business Decisions
+Orphan assignment optimization algorithm?
+
+Grace period for failed monthly fees?
+
+Partial upgrade options for near-cap users?
+
+11.3 Compliance Decisions
+KYC verification level required?
+
+Tax reporting frequency?
+
+Audit trail retention period?
+
+12. Next Steps
+Immediate (This Week):
+Finalize PRD with stakeholders
+
+Sign off on business logic
+
+Approve GBP currency implementation
+
+Confirm Phase 1 scope
+
+Week 1-2:
+Database design & implementation
+
+Basic API endpoints
+
+Unit test framework
+
+Development environment setup
+
+Week 3-4:
+Commission engine implementation
+
+Auto-upgrade system
+
+Basic frontend visualization
+
+Integration testing
+
+Ready for PRD Review?
+Shall we:
+
+Review this PRD section by section?
+
+Make any corrections/additions?
+
+Get stakeholder sign-off?
+
+Then proceed to technical design?
+
+This is the professional way forward. No code until PRD is approved by all stakeholders
