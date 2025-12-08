@@ -12,7 +12,7 @@ Enforce tier-based monthly earning caps
 
 Auto-manage user upgrades using earned commissions
 
-Allocate surplus to Poverty Fund (80% relief, 20% MegaBucks)
+Allocate surplus to Poverty Fund (80% relief, 20% MegaBucks) - We would need 2 individual tables [storage] for this aspect.
 
 Provide real-time financial visibility to users
 
