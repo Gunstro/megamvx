@@ -1,1 +1,969 @@
+MegaMatrix Commission Engine - Technical Design Document
+Section 1: Database Schema Design
+1.1 Design Principles
+Currency: All monetary amounts in GBP (£)
 
+Precision: DECIMAL(10,2) for all financial amounts (supports up to £99,999,999.99)
+
+Performance: Optimized for high read/write volume
+
+Auditability: Complete transaction trail for compliance
+
+Scalability: Designed for billions of rows
+
+1.2 Core Tables
+Table 1: visa_tiers - Visa Tier Master Data
+sql
+CREATE TABLE visa_tiers (
+    -- Primary Identifier
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    
+    -- Tier Information
+    name VARCHAR(50) UNIQUE NOT NULL,
+    description TEXT,
+    tier_order INTEGER UNIQUE NOT NULL, -- For sorting/upgrade path
+    
+    -- Financial Attributes (GBP)
+    once_off_price_gbp DECIMAL(10,2) NOT NULL CHECK (once_off_price_gbp >= 0),
+    monthly_fee_gbp DECIMAL(10,2) NOT NULL CHECK (monthly_fee_gbp >= 0),
+    monthly_cap_gbp DECIMAL(10,2) NOT NULL CHECK (monthly_cap_gbp >= 0),
+    
+    -- Business Rules
+    is_free_tier BOOLEAN DEFAULT FALSE,
+    monthly_fee_trigger_percent DECIMAL(5,2) DEFAULT 110.00, -- 110% = fee × 1.10
+    auto_upgrade_at_cap BOOLEAN DEFAULT FALSE, -- Free tier only
+    
+    -- Matrix Restrictions
+    allowed_matrix_level INTEGER CHECK (
+        allowed_matrix_level BETWEEN 1 AND 8 
+        OR allowed_matrix_level IS NULL
+    ),
+    max_positions_available INTEGER, -- NULL = unlimited
+    
+    -- System Fields
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    
+    -- Constraints
+    CHECK (CASE 
+        WHEN is_free_tier = TRUE THEN monthly_fee_gbp = 0 
+        ELSE TRUE 
+    END),
+    CHECK (monthly_fee_trigger_percent BETWEEN 100 AND 200)
+);
+
+-- Indexes
+CREATE INDEX idx_visa_tiers_order ON visa_tiers(tier_order);
+CREATE INDEX idx_visa_tiers_active ON visa_tiers(is_active) WHERE is_active = TRUE;
+CREATE INDEX idx_visa_tiers_level ON visa_tiers(allowed_matrix_level);
+
+-- Insert Master Data (GBP values)
+INSERT INTO visa_tiers (
+    name, tier_order, once_off_price_gbp, monthly_fee_gbp, monthly_cap_gbp, 
+    is_free_tier, auto_upgrade_at_cap, allowed_matrix_level, max_positions_available
+) VALUES
+-- Free Tier (Special Rules)
+('Free', 1, 0.00, 0.00, 95.00, TRUE, TRUE, NULL, NULL),
+
+-- Standard Tiers (Level 3+)
+('Novice', 2, 95.00, 125.00, 300.00, FALSE, FALSE, NULL, NULL),
+('City Dweller', 3, 295.00, 195.00, 1350.00, FALSE, FALSE, NULL, NULL),
+('City Patron', 4, 395.00, 325.00, 2150.00, FALSE, FALSE, NULL, NULL),
+('Executive', 5, 495.00, 395.00, 6500.00, FALSE, FALSE, NULL, NULL),
+('Ambassador', 6, 695.00, 545.00, 8500.00, FALSE, FALSE, NULL, NULL),
+
+-- Premiere Tiers (Level 2 Only)
+('Gold Premiere', 7, 985.00, 785.00, 12500.00, FALSE, FALSE, 2, 175000),
+('VIP Gold Premiere', 8, 1250.00, 995.00, 18000.00, FALSE, FALSE, 2, 225000),
+
+-- Founder Tiers (Level 1 Only)
+('Gold Founder', 9, 2250.00, 0.00, 20000.00, FALSE, FALSE, 1, 8250),
+('VIP Gold Founder', 10, 3750.00, 0.00, 22500.00, FALSE, FALSE, 1, 11750);
+Table 2: users - Extended User Information
+sql
+-- Extends Supabase auth.users table
+CREATE TABLE users (
+    -- Link to Supabase Auth
+    id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    
+    -- Personal Information
+    first_name VARCHAR(100),
+    last_name VARCHAR(100),
+    phone VARCHAR(20),
+    date_of_birth DATE,
+    
+    -- KYC Information
+    kyc_status VARCHAR(20) DEFAULT 'pending' CHECK (kyc_status IN ('pending', 'verified', 'rejected', 'expired')),
+    kyc_verified_at TIMESTAMPTZ,
+    kyc_document_type VARCHAR(50),
+    
+    -- Geographic Information (for MegaPartner)
+    country_code CHAR(2),
+    administrative_area VARCHAR(100), -- State/Province
+    locality VARCHAR(100), -- City/Town
+    postal_code VARCHAR(20),
+    
+    -- System Fields
+    agreed_to_terms BOOLEAN DEFAULT FALSE,
+    marketing_opt_in BOOLEAN DEFAULT FALSE,
+    is_active BOOLEAN DEFAULT TRUE,
+    
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    last_login_at TIMESTAMPTZ,
+    
+    -- Constraints
+    CHECK (date_of_birth <= CURRENT_DATE - INTERVAL '18 years') -- Minimum age 18
+);
+
+-- Indexes
+CREATE INDEX idx_users_kyc_status ON users(kyc_status);
+CREATE INDEX idx_users_country ON users(country_code);
+CREATE INDEX idx_users_active ON users(is_active) WHERE is_active = TRUE;
+CREATE INDEX idx_users_created ON users(created_at);
+Table 3: matrix_positions - User Matrix Placement
+sql
+CREATE TABLE matrix_positions (
+    -- Primary Identifier
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    
+    -- User Reference
+    user_id UUID UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    
+    -- Position in Matrix
+    sponsor_id UUID REFERENCES users(id), -- Immediate upline (NULL for Level 0)
+    matrix_level INTEGER NOT NULL CHECK (matrix_level BETWEEN 0 AND 8),
+    
+    -- For Level 1/2: Specific position tracking
+    level_position_number BIGINT, -- Sequential position within level (1..max)
+    level_max_positions BIGINT, -- Capacity at this level (20K, 400K, etc.)
+    
+    -- Visa Information
+    visa_tier_id UUID NOT NULL REFERENCES visa_tiers(id),
+    visa_acquired_at TIMESTAMPTZ DEFAULT NOW(),
+    
+    -- Downline Capacity Tracking
+    max_downline_capacity INTEGER NOT NULL, -- 20, 10, or 5 based on level
+    current_downline_count INTEGER DEFAULT 0 CHECK (current_downline_count >= 0),
+    
+    -- Position Status
+    is_orphan BOOLEAN DEFAULT FALSE, -- System-assigned (no sponsor)
+    is_active BOOLEAN DEFAULT TRUE,
+    
+    -- System Fields
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    
+    -- Constraints
+    CHECK (current_downline_count <= max_downline_capacity),
+    CHECK (
+        (matrix_level = 0 AND sponsor_id IS NULL) OR
+        (matrix_level > 0 AND sponsor_id IS NOT NULL)
+    ),
+    
+    -- Unique constraint for Level 1/2 positions
+    UNIQUE NULLS NOT DISTINCT (matrix_level, level_position_number)
+);
+
+-- Indexes (Critical for Performance)
+CREATE INDEX idx_matrix_sponsor ON matrix_positions(sponsor_id) WHERE sponsor_id IS NOT NULL;
+CREATE INDEX idx_matrix_level ON matrix_positions(matrix_level);
+CREATE INDEX idx_matrix_visa_tier ON matrix_positions(visa_tier_id);
+CREATE INDEX idx_matrix_active ON matrix_positions(is_active) WHERE is_active = TRUE;
+CREATE INDEX idx_matrix_level_position ON matrix_positions(matrix_level, level_position_number) 
+    WHERE level_position_number IS NOT NULL;
+CREATE INDEX idx_matrix_downline_capacity ON matrix_positions(max_downline_capacity, current_downline_count);
+
+-- Create Level 0 Position (Poverty Relief Ltd)
+-- Note: This will be created during system initialization
+Table 4: user_financials - Financial Tracking
+sql
+CREATE TABLE user_financials (
+    -- Primary Identifier
+    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    
+    -- Current Visa Tier
+    current_visa_tier_id UUID NOT NULL REFERENCES visa_tiers(id),
+    
+    -- Wallet System (GBP)
+    wallet_balance_gbp DECIMAL(10,2) DEFAULT 0 CHECK (wallet_balance_gbp >= 0),
+    pending_balance_gbp DECIMAL(10,2) DEFAULT 0 CHECK (pending_balance_gbp >= 0), -- 10-day hold
+    
+    -- Monthly Tracking
+    current_month_earnings_gbp DECIMAL(10,2) DEFAULT 0 CHECK (current_month_earnings_gbp >= 0),
+    current_month_start_date DATE DEFAULT DATE_TRUNC('month', CURRENT_DATE),
+    
+    -- Monthly Fee Management
+    monthly_fee_paid_until DATE,
+    next_fee_due_date DATE GENERATED ALWAYS AS (
+        COALESCE(monthly_fee_paid_until, CURRENT_DATE) + INTERVAL '1 month'
+    ) STORED,
+    fee_trigger_met_current_month BOOLEAN DEFAULT FALSE,
+    
+    -- Upgrade Tracking
+    upgrade_savings_gbp DECIMAL(10,2) DEFAULT 0 CHECK (upgrade_savings_gbp >= 0),
+    pending_upgrade_to_tier_id UUID REFERENCES visa_tiers(id),
+    last_upgrade_date DATE,
+    
+    -- Lifetime Statistics
+    total_earned_gbp DECIMAL(12,2) DEFAULT 0 CHECK (total_earned_gbp >= 0),
+    total_withdrawn_gbp DECIMAL(12,2) DEFAULT 0 CHECK (total_withdrawn_gbp >= 0),
+    total_upgraded_gbp DECIMAL(12,2) DEFAULT 0 CHECK (total_upgraded_gbp >= 0),
+    
+    -- System Fields
+    last_financial_update TIMESTAMPTZ DEFAULT NOW(),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    
+    -- Constraints
+    CHECK (upgrade_savings_gbp <= wallet_balance_gbp),
+    CHECK (pending_balance_gbp <= wallet_balance_gbp)
+);
+
+-- Indexes
+CREATE INDEX idx_financials_visa_tier ON user_financials(current_visa_tier_id);
+CREATE INDEX idx_financials_fee_due ON user_financials(next_fee_due_date) 
+    WHERE next_fee_due_date IS NOT NULL;
+CREATE INDEX idx_financials_month_start ON user_financials(current_month_start_date);
+Table 5: commission_events - Commission Triggers
+sql
+CREATE TABLE commission_events (
+    -- Primary Identifier
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    
+    -- Purchase Information
+    purchaser_user_id UUID NOT NULL REFERENCES users(id),
+    purchase_amount_gbp DECIMAL(10,2) NOT NULL CHECK (purchase_amount_gbp > 0),
+    purchase_type VARCHAR(50) NOT NULL CHECK (purchase_type IN ('visa', 'product', 'service')),
+    
+    -- Commission Pools (GBP)
+    matrix_commission_pool_gbp DECIMAL(10,2) GENERATED ALWAYS AS (
+        purchase_amount_gbp * 0.40
+    ) STORED,
+    megapartner_commission_pool_gbp DECIMAL(10,2) GENERATED ALWAYS AS (
+        purchase_amount_gbp * 0.285
+    ) STORED,
+    
+    -- Timing
+    purchased_at TIMESTAMPTZ NOT NULL,
+    commission_due_at TIMESTAMPTZ GENERATED ALWAYS AS (
+        purchased_at + INTERVAL '10 days'
+    ) STORED,
+    processed_at TIMESTAMPTZ,
+    
+    -- Status Tracking
+    status VARCHAR(20) DEFAULT 'pending' CHECK (
+        status IN ('pending', 'processing', 'completed', 'cancelled', 'failed')
+    ),
+    retry_count INTEGER DEFAULT 0,
+    
+    -- Audit
+    created_by_system BOOLEAN DEFAULT TRUE,
+    error_message TEXT,
+    
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    
+    -- Constraints
+    CHECK (commission_due_at > purchased_at),
+    CHECK (processed_at IS NULL OR processed_at >= purchased_at)
+);
+
+-- Indexes (Optimized for Commission Processing)
+CREATE INDEX idx_comm_events_status_due ON commission_events(status, commission_due_at)
+    WHERE status = 'pending';
+CREATE INDEX idx_comm_events_purchaser ON commission_events(purchaser_user_id, purchased_at);
+CREATE INDEX idx_comm_events_processed ON commission_events(processed_at) 
+    WHERE processed_at IS NOT NULL;
+CREATE INDEX idx_comm_events_purchase_date ON commission_events(DATE(purchased_at));
+Table 6: commission_distributions - Individual Commission Payments
+sql
+CREATE TABLE commission_distributions (
+    -- Primary Identifier
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    
+    -- Event Reference
+    commission_event_id UUID NOT NULL REFERENCES commission_events(id),
+    
+    -- Recipient Information
+    receiver_user_id UUID NOT NULL REFERENCES users(id),
+    receiver_matrix_level INTEGER NOT NULL CHECK (receiver_matrix_level BETWEEN 0 AND 8),
+    level_distance INTEGER NOT NULL CHECK (level_distance BETWEEN 1 AND 5),
+    
+    -- Commission Rates (from commission_rates table)
+    commission_rate DECIMAL(5,4) NOT NULL CHECK (commission_rate BETWEEN 0 AND 1),
+    
+    -- Amounts (GBP)
+    calculated_amount_gbp DECIMAL(10,2) NOT NULL CHECK (calculated_amount_gbp >= 0),
+    applied_cap_gbp DECIMAL(10,2), -- NULL = no cap applied
+    paid_amount_gbp DECIMAL(10,2) NOT NULL CHECK (paid_amount_gbp >= 0),
+    surplus_amount_gbp DECIMAL(10,2) DEFAULT 0 CHECK (surplus_amount_gbp >= 0),
+    
+    -- Cap Application Details
+    cap_type VARCHAR(20) CHECK (cap_type IN ('daily', 'weekly', 'monthly', 'lifetime', 'none')),
+    cap_applied_at TIMESTAMPTZ,
+    
+    -- Payment Status
+    status VARCHAR(20) DEFAULT 'pending' CHECK (
+        status IN ('pending', 'processing', 'paid', 'capped', 'failed', 'surplus')
+    ),
+    paid_at TIMESTAMPTZ,
+    
+    -- System Fields
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    
+    -- Constraints
+    CHECK (paid_amount_gbp + surplus_amount_gbp = calculated_amount_gbp),
+    CHECK (paid_at IS NULL OR paid_at >= created_at)
+);
+
+-- Indexes (Optimized for Reporting and Queries)
+CREATE INDEX idx_comm_dist_receiver ON commission_distributions(receiver_user_id, status);
+CREATE INDEX idx_comm_dist_event ON commission_distributions(commission_event_id);
+CREATE INDEX idx_comm_dist_level ON commission_distributions(level_distance);
+CREATE INDEX idx_comm_dist_paid_date ON commission_distributions(DATE(paid_at)) 
+    WHERE paid_at IS NOT NULL;
+CREATE INDEX idx_comm_dist_status_created ON commission_distributions(status, created_at);
+Table 7: poverty_fund - Surplus Management
+sql
+CREATE TABLE poverty_fund (
+    -- Primary Identifier
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    
+    -- Source of Funds
+    source_type VARCHAR(50) NOT NULL CHECK (
+        source_type IN ('cap_surplus', 'overflow_commission', 'direct_donation', 'company_contribution')
+    ),
+    source_user_id UUID REFERENCES users(id),
+    source_commission_distribution_id UUID REFERENCES commission_distributions(id),
+    
+    -- Amount (GBP)
+    amount_gbp DECIMAL(10,2) NOT NULL CHECK (amount_gbp > 0),
+    
+    -- Allocation
+    allocated_to_megabucks_gbp DECIMAL(10,2) GENERATED ALWAYS AS (amount_gbp * 0.20) STORED,
+    allocated_to_relief_gbp DECIMAL(10,2) GENERATED ALWAYS AS (amount_gbp * 0.80) STORED,
+    
+    -- Status
+    status VARCHAR(20) DEFAULT 'accumulated' CHECK (
+        status IN ('accumulated', 'allocated', 'distributed', 'reserved')
+    ),
+    
+    -- Distribution Tracking
+    distribution_date DATE, -- Monthly distribution date
+    distribution_batch_id UUID, -- Links to distribution batch
+    
+    -- System Fields
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    allocated_at TIMESTAMPTZ,
+    distributed_at TIMESTAMPTZ,
+    
+    -- Constraints
+    CHECK (allocated_at IS NULL OR allocated_at >= created_at),
+    CHECK (distributed_at IS NULL OR distributed_at >= allocated_at)
+);
+
+-- Indexes
+CREATE INDEX idx_poverty_fund_source ON poverty_fund(source_type, source_user_id);
+CREATE INDEX idx_poverty_fund_status ON poverty_fund(status);
+CREATE INDEX idx_poverty_fund_date ON poverty_fund(DATE(created_at));
+CREATE INDEX idx_poverty_fund_distribution ON poverty_fund(distribution_date) 
+    WHERE distribution_date IS NOT NULL;
+Table 8: upgrade_transactions - Visa Upgrade History
+sql
+CREATE TABLE upgrade_transactions (
+    -- Primary Identifier
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    
+    -- User Information
+    user_id UUID NOT NULL REFERENCES users(id),
+    
+    -- Upgrade Details
+    from_visa_tier_id UUID NOT NULL REFERENCES visa_tiers(id),
+    to_visa_tier_id UUID NOT NULL REFERENCES visa_tiers(id),
+    
+    -- Financial Details (GBP)
+    upgrade_cost_gbp DECIMAL(10,2) NOT NULL CHECK (upgrade_cost_gbp >= 0),
+    wallet_balance_before_gbp DECIMAL(10,2) NOT NULL CHECK (wallet_balance_before_gbp >= 0),
+    wallet_balance_after_gbp DECIMAL(10,2) NOT NULL CHECK (wallet_balance_after_gbp >= 0),
+    
+    -- Trigger Information
+    trigger_type VARCHAR(20) NOT NULL CHECK (
+        trigger_type IN ('auto_free_upgrade', 'user_initiated', 'system_prompted', 'forced_cap')
+    ),
+    trigger_amount_gbp DECIMAL(10,2), -- Amount that triggered upgrade
+    
+    -- System Fields
+    processed_at TIMESTAMPTZ DEFAULT NOW(),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    
+    -- Constraints
+    CHECK (to_visa_tier_id != from_visa_tier_id),
+    CHECK (wallet_balance_after_gbp = wallet_balance_before_gbp - upgrade_cost_gbp)
+);
+
+-- Indexes
+CREATE INDEX idx_upgrade_user ON upgrade_transactions(user_id, processed_at);
+CREATE INDEX idx_upgrade_from_tier ON upgrade_transactions(from_visa_tier_id);
+CREATE INDEX idx_upgrade_to_tier ON upgrade_transactions(to_visa_tier_id);
+CREATE INDEX idx_upgrade_date ON upgrade_transactions(DATE(processed_at));
+Table 9: monthly_fee_transactions - Fee Payment History
+sql
+CREATE TABLE monthly_fee_transactions (
+    -- Primary Identifier
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    
+    -- User Information
+    user_id UUID NOT NULL REFERENCES users(id),
+    visa_tier_id UUID NOT NULL REFERENCES visa_tiers(id),
+    
+    -- Fee Details (GBP)
+    fee_amount_gbp DECIMAL(10,2) NOT NULL CHECK (fee_amount_gbp > 0),
+    wallet_balance_before_gbp DECIMAL(10,2) NOT NULL CHECK (wallet_balance_before_gbp >= 0),
+    wallet_balance_after_gbp DECIMAL(10,2) NOT NULL CHECK (wallet_balance_after_gbp >= 0),
+    
+    -- Trigger Information
+    trigger_monthly_earnings_gbp DECIMAL(10,2) NOT NULL CHECK (trigger_monthly_earnings_gbp >= 0),
+    trigger_threshold_gbp DECIMAL(10,2) NOT NULL CHECK (trigger_threshold_gbp > 0),
+    
+    -- Period Covered
+    fee_period_start DATE NOT NULL,
+    fee_period_end DATE NOT NULL,
+    
+    -- Payment Status
+    status VARCHAR(20) DEFAULT 'paid' CHECK (status IN ('paid', 'pending', 'failed', 'waived')),
+    
+    -- System Fields
+    processed_at TIMESTAMPTZ DEFAULT NOW(),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    
+    -- Constraints
+    CHECK (fee_period_end > fee_period_start),
+    CHECK (wallet_balance_after_gbp = wallet_balance_before_gbp - fee_amount_gbp),
+    CHECK (trigger_monthly_earnings_gbp >= trigger_threshold_gbp)
+);
+
+-- Indexes
+CREATE INDEX idx_fee_user ON monthly_fee_transactions(user_id, processed_at);
+CREATE INDEX idx_fee_period ON monthly_fee_transactions(fee_period_start, fee_period_end);
+CREATE INDEX idx_fee_status ON monthly_fee_transactions(status);
+CREATE INDEX idx_fee_date ON monthly_fee_transactions(DATE(processed_at));
+Table 10: audit_log - System Audit Trail
+sql
+CREATE TABLE audit_log (
+    -- Primary Identifier
+    id BIGSERIAL PRIMARY KEY,
+    
+    -- Audit Information
+    event_type VARCHAR(100) NOT NULL,
+    event_subtype VARCHAR(100),
+    
+    -- Entity Reference
+    entity_type VARCHAR(50) NOT NULL,
+    entity_id UUID NOT NULL,
+    
+    -- User Context
+    performed_by_user_id UUID REFERENCES users(id),
+    performed_by_system BOOLEAN DEFAULT FALSE,
+    
+    -- Change Details
+    old_values JSONB,
+    new_values JSONB,
+    changes JSONB GENERATED ALWAYS AS (
+        CASE 
+            WHEN old_values IS NOT NULL AND new_values IS NOT NULL THEN
+                (SELECT jsonb_object_agg(key, value)
+                 FROM jsonb_each(new_values)
+                 WHERE (old_values -> key) IS DISTINCT FROM value)
+            ELSE NULL
+        END
+    ) STORED,
+    
+    -- Request Context
+    ip_address INET,
+    user_agent TEXT,
+    request_id UUID,
+    
+    -- System Fields
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    
+    -- Constraints
+    CHECK (performed_by_user_id IS NOT NULL OR performed_by_system = TRUE)
+);
+
+-- Indexes (Optimized for Investigation)
+CREATE INDEX idx_audit_entity ON audit_log(entity_type, entity_id, created_at);
+CREATE INDEX idx_audit_user ON audit_log(performed_by_user_id, created_at);
+CREATE INDEX idx_audit_event ON audit_log(event_type, created_at);
+CREATE INDEX idx_audit_date ON audit_log(DATE(created_at));
+CREATE INDEX idx_audit_request ON audit_log(request_id) WHERE request_id IS NOT NULL;
+
+-- Partition by month for performance (if needed for large volumes)
+-- CREATE TABLE audit_log_y2024m01 PARTITION OF audit_log FOR VALUES FROM ('2024-01-01') TO ('2024-02-01');
+1.3 Lookup Tables
+Table 11: commission_rates - Fixed Commission Structure
+sql
+CREATE TABLE commission_rates (
+    -- Primary Key
+    level_distance INTEGER PRIMARY KEY CHECK (level_distance BETWEEN 1 AND 5),
+    
+    -- Commission Rate
+    commission_rate DECIMAL(5,4) NOT NULL CHECK (commission_rate BETWEEN 0 AND 1),
+    description VARCHAR(100) NOT NULL,
+    
+    -- System Fields
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Insert Fixed Commission Rates
+INSERT INTO commission_rates (level_distance, commission_rate, description) VALUES
+(1, 0.20, 'Immediate upline - 20%'),
+(2, 0.03, 'Second upline - 3%'),
+(3, 0.04, 'Third upline - 4%'),
+(4, 0.05, 'Fourth upline - 5%'),
+(5, 0.08, 'Fifth upline - 8%');
+Table 12: level_capacity - Matrix Level Configuration
+sql
+CREATE TABLE level_capacity (
+    -- Primary Key
+    matrix_level INTEGER PRIMARY KEY CHECK (matrix_level BETWEEN 0 AND 8),
+    
+    -- Level Information
+    level_name VARCHAR(50) NOT NULL,
+    description TEXT,
+    
+    -- Capacity Configuration
+    total_positions BIGINT NOT NULL CHECK (total_positions > 0),
+    current_positions BIGINT DEFAULT 0 CHECK (current_positions >= 0),
+    downline_capacity_per_user INTEGER NOT NULL CHECK (downline_capacity_per_user > 0),
+    
+    -- Status
+    is_accepting_new_users BOOLEAN DEFAULT TRUE,
+    
+    -- System Fields
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    
+    -- Constraints
+    CHECK (current_positions <= total_positions)
+);
+
+-- Insert Level Configuration
+INSERT INTO level_capacity (matrix_level, level_name, total_positions, downline_capacity_per_user) VALUES
+(0, 'Poverty Relief', 1, 20000),
+(1, 'Founder Level', 20000, 20),
+(2, 'Premiere Level', 400000, 10),
+(3, 'Standard Level 3', 4000000, 5),
+(4, 'Standard Level 4', 20000000, 5),
+(5, 'Standard Level 5', 100000000, 5),
+(6, 'Standard Level 6', 500000000, 5),
+(7, 'Standard Level 7', 2500000000, 5),
+(8, 'Standard Level 8', 12500000000, 5);
+1.4 Views for Reporting
+View 1: user_matrix_view - Complete User Matrix View
+sql
+CREATE OR REPLACE VIEW user_matrix_view AS
+SELECT 
+    u.id as user_id,
+    u.first_name,
+    u.last_name,
+    u.email,
+    u.kyc_status,
+    
+    mp.matrix_level,
+    mp.sponsor_id,
+    s.first_name as sponsor_first_name,
+    s.last_name as sponsor_last_name,
+    mp.level_position_number,
+    mp.max_downline_capacity,
+    mp.current_downline_count,
+    mp.is_orphan,
+    
+    vt.name as current_visa_tier,
+    vt.once_off_price_gbp,
+    vt.monthly_fee_gbp,
+    vt.monthly_cap_gbp,
+    
+    uf.wallet_balance_gbp,
+    uf.current_month_earnings_gbp,
+    uf.next_fee_due_date,
+    uf.fee_trigger_met_current_month,
+    
+    mp.created_at as matrix_join_date,
+    uf.last_financial_update
+    
+FROM users u
+JOIN matrix_positions mp ON mp.user_id = u.id
+LEFT JOIN users s ON s.id = mp.sponsor_id
+JOIN user_financials uf ON uf.user_id = u.id
+JOIN visa_tiers vt ON vt.id = uf.current_visa_tier_id
+WHERE mp.is_active = TRUE
+ORDER BY mp.matrix_level, mp.level_position_number NULLS LAST;
+View 2: commission_summary_daily - Daily Commission Reporting
+sql
+CREATE OR REPLACE VIEW commission_summary_daily AS
+SELECT 
+    DATE(ce.created_at) as report_date,
+    COUNT(DISTINCT ce.id) as total_transactions,
+    COUNT(DISTINCT ce.purchaser_user_id) as unique_purchasers,
+    SUM(ce.purchase_amount_gbp) as total_purchase_volume_gbp,
+    SUM(ce.matrix_commission_pool_gbp) as total_commission_pool_gbp,
+    
+    COUNT(DISTINCT cd.receiver_user_id) as unique_commission_receivers,
+    SUM(cd.paid_amount_gbp) as total_commissions_paid_gbp,
+    SUM(cd.surplus_amount_gbp) as total_surplus_to_poverty_fund_gbp,
+    
+    -- Average commission per receiver
+    ROUND(AVG(cd.paid_amount_gbp), 2) as avg_commission_per_receiver_gbp,
+    
+    -- Success rate
+    ROUND(
+        COUNT(DISTINCT CASE WHEN cd.status = 'paid' THEN cd.id END) * 100.0 / 
+        COUNT(DISTINCT cd.id), 
+        2
+    ) as payment_success_rate_percent
+    
+FROM commission_events ce
+LEFT JOIN commission_distributions cd ON cd.commission_event_id = ce.id
+WHERE ce.status = 'completed'
+GROUP BY DATE(ce.created_at)
+ORDER BY DATE(ce.created_at) DESC;
+View 3: user_earnings_dashboard - User Earnings Summary
+sql
+CREATE OR REPLACE VIEW user_earnings_dashboard AS
+SELECT 
+    u.id as user_id,
+    u.first_name,
+    u.last_name,
+    u.email,
+    
+    vt.name as current_visa_tier,
+    vt.monthly_cap_gbp,
+    
+    uf.wallet_balance_gbp as available_balance_gbp,
+    uf.pending_balance_gbp as pending_balance_gbp,
+    uf.current_month_earnings_gbp,
+    uf.total_earned_gbp as lifetime_earnings_gbp,
+    
+    -- Monthly fee status
+    CASE 
+        WHEN uf.next_fee_due_date <= CURRENT_DATE THEN 'Overdue'
+        WHEN uf.next_fee_due_date <= CURRENT_DATE + INTERVAL '7 days' THEN 'Due Soon'
+        ELSE 'Paid Up'
+    END as fee_status,
+    
+    uf.next_fee_due_date,
+    
+    -- Upgrade eligibility
+    CASE 
+        WHEN uf.wallet_balance_gbp >= next_tier.once_off_price_gbp THEN 'Eligible'
+        ELSE 'Not Eligible'
+    END as upgrade_eligibility,
+    
+    COALESCE(next_tier.name, 'MAX TIER') as next_tier_name,
+    COALESCE(next_tier.once_off_price_gbp, 0) as next_tier_price_gbp,
+    
+    -- Days until cap reached (estimate)
+    CASE 
+        WHEN uf.current_month_earnings_gbp > 0 THEN
+            FLOOR((vt.monthly_cap_gbp - uf.current_month_earnings_gbp) / 
+                  (uf.current_month_earnings_gbp / EXTRACT(DAY FROM CURRENT_DATE)))
+        ELSE NULL
+    END as estimated_days_until_cap,
+    
+    -- Risk of surplus loss
+    CASE 
+        WHEN uf.wallet_balance_gbp >= vt.monthly_cap_gbp * 0.9 THEN 'High Risk'
+        WHEN uf.wallet_balance_gbp >= vt.monthly_cap_gbp * 0.7 THEN 'Medium Risk'
+        ELSE 'Low Risk'
+    END as surplus_risk_level
+    
+FROM users u
+JOIN user_financials uf ON uf.user_id = u.id
+JOIN visa_tiers vt ON vt.id = uf.current_visa_tier_id
+LEFT JOIN visa_tiers next_tier ON next_tier.tier_order = vt.tier_order + 1
+WHERE u.is_active = TRUE
+ORDER BY uf.current_month_earnings_gbp DESC;
+1.5 Functions
+Function 1: get_upline_chain - Calculate Upline for Commissions
+sql
+CREATE OR REPLACE FUNCTION get_upline_chain(
+    p_user_id UUID,
+    p_max_levels INTEGER DEFAULT 5
+)
+RETURNS TABLE (
+    ancestor_user_id UUID,
+    level_distance INTEGER,
+    ancestor_matrix_level INTEGER
+) AS $$
+DECLARE
+    current_user_id UUID := p_user_id;
+    current_level_distance INTEGER := 1;
+    current_sponsor_id UUID;
+BEGIN
+    WHILE current_level_distance <= p_max_levels LOOP
+        -- Get immediate sponsor
+        SELECT sponsor_id INTO current_sponsor_id
+        FROM matrix_positions
+        WHERE user_id = current_user_id
+          AND is_active = TRUE;
+        
+        -- If no sponsor, break
+        EXIT WHEN current_sponsor_id IS NULL;
+        
+        -- Get sponsor's matrix level
+        SELECT matrix_level INTO ancestor_matrix_level
+        FROM matrix_positions
+        WHERE user_id = current_sponsor_id
+          AND is_active = TRUE;
+        
+        -- Return this ancestor
+        ancestor_user_id := current_sponsor_id;
+        level_distance := current_level_distance;
+        RETURN NEXT;
+        
+        -- Move up the chain
+        current_user_id := current_sponsor_id;
+        current_level_distance := current_level_distance + 1;
+    END LOOP;
+END;
+$$ LANGUAGE plpgsql;
+Function 2: calculate_commission_distribution - Core Commission Logic
+sql
+CREATE OR REPLACE FUNCTION calculate_commission_distribution(
+    p_commission_event_id UUID
+)
+RETURNS TABLE (
+    receiver_user_id UUID,
+    level_distance INTEGER,
+    commission_rate DECIMAL(5,4),
+    calculated_amount_gbp DECIMAL(10,2),
+    cap_to_apply_gbp DECIMAL(10,2)
+) AS $$
+DECLARE
+    v_commission_event RECORD;
+    v_upline_record RECORD;
+    v_receiver_financials RECORD;
+    v_commission_amount DECIMAL(10,2);
+    v_available_cap_gbp DECIMAL(10,2);
+BEGIN
+    -- Get commission event details
+    SELECT * INTO v_commission_event
+    FROM commission_events
+    WHERE id = p_commission_event_id;
+    
+    -- Calculate for each upline member
+    FOR v_upline_record IN 
+        SELECT * FROM get_upline_chain(v_commission_event.purchaser_user_id, 5)
+    LOOP
+        -- Get commission rate for this level distance
+        SELECT commission_rate INTO commission_rate
+        FROM commission_rates
+        WHERE level_distance = v_upline_record.level_distance
+          AND is_active = TRUE;
+        
+        -- Calculate commission amount
+        v_commission_amount := v_commission_event.matrix_commission_pool_gbp * commission_rate;
+        
+        -- Get receiver's current financial status
+        SELECT * INTO v_receiver_financials
+        FROM user_financials uf
+        JOIN visa_tiers vt ON vt.id = uf.current_visa_tier_id
+        WHERE uf.user_id = v_upline_record.ancestor_user_id;
+        
+        -- Calculate available cap
+        v_available_cap_gbp := GREATEST(
+            0, 
+            v_receiver_financials.monthly_cap_gbp - v_receiver_financials.current_month_earnings_gbp
+        );
+        
+        -- Return results
+        receiver_user_id := v_upline_record.ancestor_user_id;
+        level_distance := v_upline_record.level_distance;
+        calculated_amount_gbp := v_commission_amount;
+        cap_to_apply_gbp := LEAST(v_commission_amount, v_available_cap_gbp);
+        
+        RETURN NEXT;
+    END LOOP;
+END;
+$$ LANGUAGE plpgsql;
+1.6 Triggers
+Trigger 1: update_matrix_position_audit - Audit Matrix Changes
+sql
+CREATE OR REPLACE FUNCTION log_matrix_position_change()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO audit_log (
+        event_type,
+        entity_type,
+        entity_id,
+        performed_by_user_id,
+        performed_by_system,
+        old_values,
+        new_values
+    ) VALUES (
+        CASE 
+            WHEN TG_OP = 'INSERT' THEN 'matrix_position.created'
+            WHEN TG_OP = 'UPDATE' THEN 'matrix_position.updated'
+            WHEN TG_OP = 'DELETE' THEN 'matrix_position.deleted'
+        END,
+        'matrix_position',
+        COALESCE(NEW.id, OLD.id),
+        CURRENT_USER_ID(), -- This would need to be set from application
+        FALSE,
+        CASE WHEN TG_OP IN ('UPDATE', 'DELETE') THEN row_to_json(OLD) END,
+        CASE WHEN TG_OP IN ('INSERT', 'UPDATE') THEN row_to_json(NEW) END
+    );
+    
+    RETURN COALESCE(NEW, OLD);
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER matrix_position_audit_trigger
+AFTER INSERT OR UPDATE OR DELETE ON matrix_positions
+FOR EACH ROW EXECUTE FUNCTION log_matrix_position_change();
+Trigger 2: update_user_financials_timestamp - Auto-update timestamp
+sql
+CREATE OR REPLACE FUNCTION update_user_financials_timestamp()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    NEW.last_financial_update = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER user_financials_timestamp_trigger
+BEFORE UPDATE ON user_financials
+FOR EACH ROW EXECUTE FUNCTION update_user_financials_timestamp();
+1.7 Initialization Script
+Script: initialize_system.sql - System Bootstrap
+sql
+-- This script initializes the MegaMatrix system
+DO $$
+DECLARE
+    v_poverty_relief_user_id UUID;
+    v_free_tier_id UUID;
+    v_novice_tier_id UUID;
+BEGIN
+    -- Create Poverty Relief Ltd user
+    INSERT INTO auth.users (
+        email,
+        encrypted_password,
+        email_confirmed_at,
+        raw_app_meta_data,
+        raw_user_meta_data,
+        is_super_admin
+    ) VALUES (
+        'poverty.relief@megatoncities.com',
+        crypt('system_password', gen_salt('bf')), -- Change in production!
+        NOW(),
+        '{"provider": "email", "providers": ["email"]}'::jsonb,
+        '{"role": "poverty_relief", "name": "Poverty Relief Ltd"}'::jsonb,
+        FALSE
+    ) RETURNING id INTO v_poverty_relief_user_id;
+    
+    -- Create extended user record
+    INSERT INTO users (
+        id,
+        first_name,
+        last_name,
+        kyc_status,
+        kyc_verified_at,
+        agreed_to_terms
+    ) VALUES (
+        v_poverty_relief_user_id,
+        'Poverty',
+        'Relief Ltd',
+        'verified',
+        NOW(),
+        TRUE
+    );
+    
+    -- Get tier IDs
+    SELECT id INTO v_free_tier_id FROM visa_tiers WHERE name = 'Free';
+    SELECT id INTO v_novice_tier_id FROM visa_tiers WHERE name = 'Novice';
+    
+    -- Create Poverty Relief matrix position (Level 0)
+    INSERT INTO matrix_positions (
+        user_id,
+        sponsor_id,
+        matrix_level,
+        level_position_number,
+        level_max_positions,
+        visa_tier_id,
+        max_downline_capacity,
+        current_downline_count,
+        is_orphan,
+        is_active
+    ) VALUES (
+        v_poverty_relief_user_id,
+        NULL, -- No sponsor (Level 0)
+        0,
+        1,
+        1,
+        v_free_tier_id, -- Starts as Free (no cost)
+        20000, -- Can sponsor 20,000 Level 1 users
+        0,
+        FALSE,
+        TRUE
+    );
+    
+    -- Create financial record for Poverty Relief
+    INSERT INTO user_financials (
+        user_id,
+        current_visa_tier_id,
+        wallet_balance_gbp,
+        monthly_fee_paid_until,
+        fee_trigger_met_current_month
+    ) VALUES (
+        v_poverty_relief_user_id,
+        v_free_tier_id,
+        0.00,
+        NULL, -- No monthly fees
+        TRUE
+    );
+    
+    -- Update level capacity for Level 0
+    UPDATE level_capacity 
+    SET current_positions = 1
+    WHERE matrix_level = 0;
+    
+    RAISE NOTICE 'System initialized successfully. Poverty Relief Ltd user ID: %', v_poverty_relief_user_id;
+END $$;
+Next Steps:
+1. Review this database schema:
+Check all business logic is captured
+
+Verify constraints and relationships
+
+Confirm GBP handling throughout
+
+2. Create migration scripts:
+Sequential migration files
+
+Rollback scripts
+
+Data seeding scripts
+
+3. Set up database environment:
+Development database
+
+Testing database
+
+Staging database
+
+Production database
+
+4. Create API specifications:
+REST endpoints
+
+Request/response formats
+
+Authentication requirements
+
+Shall I proceed with creating the migration scripts and API specifications? Or would you like to review any part of this database design first?
